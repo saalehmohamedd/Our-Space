@@ -26,10 +26,12 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   let currentUser;
+
   try {
     currentUser = await getCurrentUserOrThrow();
   } catch (error) {
-    redirect("/sign-in");
+    console.error(error);
+    throw error;
   }
 
   // Fetch both partners to show the relationship state in the UI

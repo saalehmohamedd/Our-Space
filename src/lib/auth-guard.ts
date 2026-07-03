@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 export async function getCurrentUserOrThrow() {
   const { userId } = await auth();
 
+  console.log("userId:", userId);
+
   if (!userId) {
     throw new Error("Unauthorized");
   }
@@ -15,8 +17,10 @@ export async function getCurrentUserOrThrow() {
     where: { clerkId: userId },
   });
 
+  console.log("db user:", user);
+
   if (!user) {
-    throw new Error("Authorized Clerk user is not registered in Our Space");
+    throw new Error("User not found");
   }
 
   return user;
