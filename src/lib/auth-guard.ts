@@ -1,0 +1,23 @@
+import "server-only";
+
+import { auth } from "@clerk/nextjs/server";
+
+import { prisma } from "@/lib/prisma";
+
+export async function getCurrentUserOrThrow() {
+  const { userId } = await auth();
+
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user) {
+    throw new Error("Authorized Clerk user is not registered in Our Space");
+  }
+
+  return user;
+}

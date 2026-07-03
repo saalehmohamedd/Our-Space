@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String        @id @default(uuid())
+  clerkId         String        @unique
+  role            Role          @unique
+  name            String
+  email           String        @unique
+  avatarUrl       String?
+  createdAt       DateTime      @default(now())
+  achievements    Achievement[] @relation("AchievementCreatedBy")
+  loveLettersSent LoveLetter[]  @relation("LoveLettersSent")
+  notes           PrivateNote[]
+  reminders       Reminder[]
+}
+
+model Image {
+  id         String   @id @default(uuid())
+  url        String
+  publicId   String
+  entityType String
+  entityId   String
+  isCover    Boolean  @default(false)
+  isFavorite Boolean  @default(false)
+  width      Int?
+  height     Int?
+  createdAt  DateTime @default(now())
+  memoryId   String?
+  memory     Memory?  @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+  @@index([isFavorite])
+}
+
+model Memory {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  date        DateTime
+  tags        String[]
+  isFavorite  Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  images      Image[]
+
+  @@index([isArchived])
+  @@index([date])
+}
+
+model WishlistItem {
+  id         String         @id @default(uuid())
+  name       String
+  price      Decimal?
+  link       String?
+  notes      String?
+  priority   Priority       @default(MEDIUM)
+  status     WishlistStatus @default(WANT)
+  tags       String[]
+  isFavorite Boolean        @default(false)
+  isArchived Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([status])
+}
+
+model ShoppingListItem {
+  id        String   @id @default(uuid())
+  name      String
+  category  String?
+  quantity  Int      @default(1)
+  checked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Place {
+  id              String   @id @default(uuid())
+  country         String
+  city            String
+  notes           String?
+  estimatedBudget Decimal?
+  priority        Priority @default(MEDIUM)
+  googleMapsUrl   String?
+  visited         Boolean  @default(false)
+  tags            String[]
+  isFavorite      Boolean  @default(false)
+  isArchived      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  name            String?
+}
+
+model DateOuting {
+  id          String   @id @default(uuid())
+  title       String
+  date        DateTime
+  location    String?
+  description String?
+  rating      Int?
+  cost        Decimal?
+  notes       String?
+  tags        String[]
+  isFavorite  Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+}
+
+model LoveLetter {
+  id         String   @id @default(uuid())
+  title      String
+  content    String
+  mood       Mood     @default(ROMANTIC)
+  date       DateTime @default(now())
+  senderId   String
+  isFavorite Boolean  @default(false)  // Add this line
+  createdAt  DateTime @default(now())
+  sender     User     @relation("LoveLettersSent", fields: [senderId], references: [id])
+
+  @@index([date])
+}
+
+model PrivateNote {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  mood      Mood?
+  date      DateTime @default(now())
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     User     @relation(fields: [ownerId], references: [id])
+
+  @@index([ownerId])
+}
+
+model Playlist {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  songs     Song[]
+}
+
+model Song {
+  id            String    @id @default(uuid())
+  title         String
+  artist        String
+  albumCoverUrl String?
+  spotifyUrl    String?
+  youtubeUrl    String?
+  appleMusicUrl String?
+  notes         String?
+  isFavorite    Boolean   @default(false)
+  playlistId    String?
+  createdAt     DateTime  @default(now())
+  playlist      Playlist? @relation(fields: [playlistId], references: [id])
+
+  @@index([playlistId])
+}
+
+model WatchItem {
+  id                String      @id @default(uuid())
+  name              String
+  type              MediaType
+  posterUrl         String?
+  streamingPlatform String?
+  trailerUrl        String?
+  imdbUrl           String?
+  notes             String?
+  status            WatchStatus @default(WANT_TO_WATCH)
+  isFavorite        Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([status])
+}
+
+model Reminder {
+  id           String   @id @default(uuid())
+  eventName    String
+  personId     String?
+  date         DateTime
+  repeatYearly Boolean  @default(true)
+  notes        String?
+  createdAt    DateTime @default(now())
+  person       User?    @relation(fields: [personId], references: [id])
+
+  @@index([date])
+}
+
+model Achievement {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  achievedAt  DateTime?
+  targetDate  DateTime?
+  isCompleted Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  createdBy   User      @relation("AchievementCreatedBy", fields: [createdById], references: [id])
+
+  @@index([isCompleted])
+}
+
+enum Role {
+  PARTNER_A
+  PARTNER_B
+}
+
+enum WishlistStatus {
+  WANT
+  SAVING
+  BOUGHT
+}
+
+enum WatchStatus {
+  WANT_TO_WATCH
+  WATCHING
+  FINISHED
+}
+
+enum MediaType {
+  MOVIE
+  TV_SHOW
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Mood {
+  HAPPY
+  ROMANTIC
+  NOSTALGIC
+  SAD
+  EXCITED
+  GRATEFUL
+  CALM
+}
