@@ -1,13 +1,9 @@
-import { getCurrentUserOrThrow } from "@/lib/auth-guard";
+import { auth } from "@clerk/nextjs/server";
 
 export default async function DashboardPage() {
-  const user = await getCurrentUserOrThrow();
+  const result = await auth();
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>Dashboard works!</h1>
-      <p>{user.name}</p>
-      <p>{user.email}</p>
-    </div>
+    <pre>{JSON.stringify(result, null, 2)}</pre>
   );
 }
