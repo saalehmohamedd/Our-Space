@@ -12,7 +12,8 @@ import {
   Bell,
   Trophy,
   ShoppingBag,
-  Star, // Add this
+  Star,
+  CreditCard
 } from "lucide-react";
 
 export const navigationItems = [
@@ -29,4 +30,5 @@ export const navigationItems = [
   { name: "Watchlist", href: "/watchlist", icon: Tv },
   { name: "Reminders", href: "/reminders", icon: Bell },
   { name: "Achievements", href: "/achievements", icon: Trophy },
+  { name: "Cards", href: "/cards", icon: CreditCard },
 ];
