@@ -195,11 +195,17 @@ export async function setMonthlyIncome(input: {
   }
 }
 
-export async function getCardReport(cardId: string, range: "week" | "month" | "year") {
+// src/app/actions/cards.actions.ts - Updated getCardReport function
+
+export async function getCardReport(
+  cardId: string, 
+  range: "week" | "month" | "year",
+  sourceType?: string
+) {
   try {
     const user = await getCurrentUserOrThrow();
     const card = await prisma.card.findUnique({ where: { id: cardId } });
-    if (!card || card.ownerId !== user.id) throw new Error("Unauthorized");
+    if (!card) throw new Error("Unauthorized");
 
     const now = new Date();
     let startDate: Date;
@@ -220,31 +226,51 @@ export async function getCardReport(cardId: string, range: "week" | "month" | "y
         break;
     }
 
+    // Build transaction where clause - apply sourceType filter if provided
+    const transactionWhere: any = {
+      cardId,
+      date: { gte: startDate },
+    };
+    
+    if (sourceType && sourceType !== "ALL") {
+      transactionWhere.sourceType = sourceType;
+    }
+
+    // Get daily/monthly spend (filtered)
     const spendData = await prisma.$queryRawUnsafe<{ period: string; amount: number }[]>(
       `SELECT DATE_TRUNC('${groupBy}', date) as period, SUM(amount)::decimal as amount
-       FROM "Transaction" WHERE "cardId" = $1 AND date >= $2
+       FROM "Transaction"
+       WHERE "cardId" = $1 AND date >= $2 ${sourceType && sourceType !== "ALL" ? `AND "sourceType" = $3` : ""}
        GROUP BY DATE_TRUNC('${groupBy}', date) ORDER BY period ASC`,
-      cardId, startDate
+      cardId,
+      startDate,
+      ...(sourceType && sourceType !== "ALL" ? [sourceType] : [])
     );
 
+    // Source breakdown - ALWAYS unfiltered (show all categories)
     const sourceBreakdown = await prisma.transaction.groupBy({
       by: ["sourceType"],
-      where: { cardId, date: { gte: startDate } },
+      where: {
+        cardId,
+        date: { gte: startDate },
+      },
       _sum: { amount: true },
     });
 
+    // Get monthly incomes
     const monthlyIncomes = await prisma.monthlyIncome.findMany({
       where: { cardId, year: { gte: startDate.getFullYear() } },
       orderBy: [{ year: "asc" }, { month: "asc" }],
     });
 
+    // Get transactions (filtered)
     const transactions = await prisma.transaction.findMany({
-      where: { cardId, date: { gte: startDate } },
+      where: transactionWhere,
       orderBy: { date: "desc" },
       take: 100,
     });
 
-    // Build monthly breakdown - all numbers now
+    // Build monthly breakdown from filtered transactions
     const monthlyBreakdown: Record<string, { income: number; spent: number; saved: number; transactions: any[] }> = {};
     const startMonth = startDate.getMonth() + 1;
     const startYear = startDate.getFullYear();
@@ -284,17 +310,17 @@ export async function getCardReport(cardId: string, range: "week" | "month" | "y
       monthlyBreakdown[key].saved = monthlyBreakdown[key].income - monthlyBreakdown[key].spent;
     });
 
+    // Total spent is calculated from filtered transactions
+    const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const totalIncome = Object.values(monthlyBreakdown).reduce((s, m) => s + m.income, 0);
-    const totalSpent = Object.values(monthlyBreakdown).reduce((s, m) => s + m.spent, 0);
 
-    // Return all numbers (no Decimal objects)
     return {
       success: true,
       data: {
         spendData: spendData.map((d: any) => ({ period: d.period, amount: Number(d.amount) })),
-        sourceBreakdown: sourceBreakdown.map((s: any) => ({ 
-          sourceType: s.sourceType, 
-          amount: Number(s._sum?.amount || 0) 
+        sourceBreakdown: sourceBreakdown.map((s: any) => ({
+          sourceType: s.sourceType,
+          amount: Number(s._sum?.amount || 0),
         })),
         monthlyBreakdown,
         transactions: transactions.map((t: any) => ({

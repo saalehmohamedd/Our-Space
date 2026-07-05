@@ -4,7 +4,10 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CardVisual } from "./card-detaild-visual";
@@ -14,6 +17,9 @@ import { AddExpenseForm } from "./add-expense-form";
 import { MonthlyBreakdown } from "./monthly-breakdown";
 import { TransactionList } from "./transaction-list";
 import { StatsCards } from "./stats-cards";
+import { SpendingCharts } from "./spending-charts";
+import { Download } from "lucide-react";
+import { generateCardReportPDF } from "@/lib/generate-card-report-pdf";
 import {
   ArrowLeft,
   Trash2,
@@ -24,6 +30,7 @@ import {
   ShoppingBag,
   Calendar,
   Star,
+  Filter,
 } from "lucide-react";
 import {
   archiveCard,
@@ -32,6 +39,16 @@ import {
   getCardReport,
 } from "@/app/actions/cards.actions";
 import { showToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+
 
 interface CardDetailClientProps {
   card: any;
@@ -53,10 +70,18 @@ const sourceLabels: Record<string, string> = {
   MANUAL: "Manual",
 };
 
+const sourceColors: Record<string, string> = {
+  WISHLIST: "border-rose-400 bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400",
+  SHOPPING: "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400",
+  DATE_OUTING: "border-pink-400 bg-pink-50 dark:bg-pink-950/20 text-pink-700 dark:text-pink-400",
+  MANUAL: "border-amber-400 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400",
+};
+
 export function CardDetailClient({ card }: CardDetailClientProps) {
   const router = useRouter();
   const [range, setRange] = useState<RangeType>("month");
   const [report, setReport] = useState<any>(null);
+  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
 
   // Form visibility
   const [showIncomeForm, setShowIncomeForm] = useState(false);
@@ -71,11 +96,11 @@ export function CardDetailClient({ card }: CardDetailClientProps) {
 
   useEffect(() => {
     loadReport();
-  }, [range]);
+  }, [range, sourceFilter]);
 
   const loadReport = async () => {
     try {
-      const data = await getCardReport(card.id, range);
+      const data = await getCardReport(card.id, range, sourceFilter || undefined);
       if (data.success) setReport(data.data);
     } catch (err) {
       console.error(err);
@@ -131,12 +156,18 @@ export function CardDetailClient({ card }: CardDetailClientProps) {
     }
   };
 
+  const handleSourceFilter = (type: string) => {
+    setSourceFilter(sourceFilter === type ? null : type);
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Back Button */}
       <Button variant="ghost" onClick={() => router.push("/cards")} className="gap-1 sm:gap-2 text-xs sm:text-sm">
         <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" /> Back
       </Button>
 
+      {/* Card Visual */}
       <CardVisual
         last4={card.last4}
         nickname={card.nickname}
@@ -145,6 +176,7 @@ export function CardDetailClient({ card }: CardDetailClientProps) {
         balance={parseFloat(card.balance)}
       />
 
+      {/* Action Buttons */}
       <div className="flex gap-1.5 sm:gap-2 justify-center flex-wrap">
         <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} className="text-[10px] sm:text-xs h-8 sm:h-9">
           <Edit3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Edit
@@ -193,6 +225,17 @@ export function CardDetailClient({ card }: CardDetailClientProps) {
             {r}
           </Button>
         ))}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => generateCardReportPDF(card, report, range)}
+          disabled={!report}
+          className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3 gap-1"
+        >
+          <Download className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+          <span className="hidden sm:inline">PDF</span>
+        </Button>
+        
       </div>
 
       {/* Stats */}
@@ -205,27 +248,65 @@ export function CardDetailClient({ card }: CardDetailClientProps) {
         />
       )}
 
+       {report && (report.monthlyBreakdown || report.sourceBreakdown) && (
+        <SpendingCharts
+          monthlyBreakdown={report.monthlyBreakdown || {}}
+          sourceBreakdown={report.sourceBreakdown || []}
+        />
+      )}
+
+      {/* Source Breakdown - Clickable Filter Chips */}
+      {report?.sourceBreakdown?.length > 0 && (
+        <div className="space-y-2 sm:space-y-3">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm sm:text-lg">Spend by Category</h3>
+            <Filter className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+          </div>
+          <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+            {/* All chip */}
+            <button
+              onClick={() => setSourceFilter(null)}
+              className={cn(
+                "gap-1 sm:gap-1.5 text-[10px] sm:text-sm py-1 sm:py-1.5 px-2 sm:px-3 rounded-full border-2 transition-all",
+                !sourceFilter
+                  ? "border-primary bg-primary/10 text-primary font-medium shadow-sm"
+                  : "border-transparent bg-muted/30 hover:bg-muted/50 text-muted-foreground"
+              )}
+            >
+              All
+            </button>
+            {/* Category chips */}
+            {report.sourceBreakdown.map((s: any) => (
+              <button
+                key={s.sourceType}
+                onClick={() => handleSourceFilter(s.sourceType)}
+                className={cn(
+                  "gap-1 sm:gap-1.5 text-[10px] sm:text-sm py-1 sm:py-1.5 px-2 sm:px-3 rounded-full border-2 transition-all flex items-center",
+                  sourceFilter === s.sourceType
+                    ? sourceColors[s.sourceType] + " shadow-sm font-medium"
+                    : "border-transparent bg-muted/30 hover:bg-muted/50 text-muted-foreground"
+                )}
+              >
+                {sourceIcons[s.sourceType]}
+                <span className="hidden sm:inline">{sourceLabels[s.sourceType]}:</span>
+                <span>${s.amount.toFixed(2)}</span>
+              </button>
+            ))}
+          </div>
+          {sourceFilter && (
+            <p className="text-xs text-muted-foreground">
+              Filtering by {sourceLabels[sourceFilter] || sourceFilter} — showing filtered results below
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Monthly Breakdown */}
       {report?.monthlyBreakdown && (
         <MonthlyBreakdown
           data={report.monthlyBreakdown}
           onDeleteTransaction={setDeleteTransactionId}
         />
-      )}
-
-      {/* Source Breakdown */}
-      {report?.sourceBreakdown?.length > 0 && (
-        <div className="space-y-2 sm:space-y-3">
-          <h3 className="font-bold text-sm sm:text-lg">Spend by Category</h3>
-          <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-            {report.sourceBreakdown.map((s: any) => (
-              <Badge key={s.sourceType} variant="secondary" className="gap-1 sm:gap-1.5 text-[10px] sm:text-sm py-1 sm:py-1.5 px-2 sm:px-3">
-                {sourceIcons[s.sourceType]}
-                <span className="hidden sm:inline">{sourceLabels[s.sourceType]}:</span> ${s.amount.toFixed(2)}
-              </Badge>
-            ))}
-          </div>
-        </div>
       )}
 
       <Separator />
