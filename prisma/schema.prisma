@@ -8,6 +8,67 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// Add these to prisma/schema.prisma
+
+enum CardBrand {
+  VISA
+  MASTERCARD
+  AMEX
+  MEEZA
+  OTHER
+}
+
+model MonthlyIncome {
+  id        String   @id @default(uuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  amount    Decimal
+  month     Int      // 1-12
+  year      Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([cardId, month, year])
+  @@index([cardId])
+}
+
+model Card {
+  id                String             @id @default(uuid())
+  nickname          String
+  brand             CardBrand
+  last4             String
+  expiryMonth       Int?
+  expiryYear        Int?
+  colorTheme        String             @default("indigo")
+  balance           Decimal            @default(0)
+  ownerId           String
+  owner             User               @relation(fields: [ownerId], references: [id])
+  isArchived        Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  transactions      Transaction[]
+  wishlistItems     WishlistItem[]
+  shoppingListItems ShoppingListItem[]
+  dateOutings       DateOuting[]
+  monthlyIncomes MonthlyIncome[]
+
+  @@index([ownerId])
+}
+
+model Transaction {
+  id         String   @id @default(uuid())
+  cardId     String
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  amount     Decimal
+  date       DateTime @default(now())
+  sourceType String
+  sourceId   String?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([cardId, date])
+  @@index([sourceType, sourceId])
+}
+
 model User {
   id              String        @id @default(uuid())
   clerkId         String        @unique
@@ -20,6 +81,7 @@ model User {
   loveLettersSent LoveLetter[]  @relation("LoveLettersSent")
   notes           PrivateNote[]
   reminders       Reminder[]
+  cards Card[]
 }
 
 model Image {
@@ -67,6 +129,8 @@ model WishlistItem {
   tags       String[]
   isFavorite Boolean        @default(false)
   isArchived Boolean        @default(false)
+  cardId String?
+  card   Card?   @relation(fields: [cardId], references: [id])
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
@@ -79,6 +143,9 @@ model ShoppingListItem {
   category  String?
   quantity  Int      @default(1)
   checked   Boolean  @default(false)
+  cost   Decimal?
+  cardId String?
+  card   Card?   @relation(fields: [cardId], references: [id])
   createdAt DateTime @default(now())
 }
 
@@ -111,6 +178,8 @@ model DateOuting {
   tags        String[]
   isFavorite  Boolean  @default(false)
   isArchived  Boolean  @default(false)
+  cardId String?
+  card   Card?   @relation(fields: [cardId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -124,8 +193,8 @@ model LoveLetter {
   mood       Mood     @default(ROMANTIC)
   date       DateTime @default(now())
   senderId   String
-  isFavorite Boolean  @default(false)  // Add this line
   createdAt  DateTime @default(now())
+  isFavorite Boolean  @default(false)
   sender     User     @relation("LoveLettersSent", fields: [senderId], references: [id])
 
   @@index([date])

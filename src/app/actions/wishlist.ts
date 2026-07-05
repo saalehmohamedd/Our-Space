@@ -46,6 +46,8 @@ export async function updateWishlistItemAction(
   }
 }
 
+// src/app/actions/wishlist.ts - Update createWishlistItemAction
+
 export async function createWishlistItemAction(data: {
   name: string;
   price?: string;
@@ -53,13 +55,14 @@ export async function createWishlistItemAction(data: {
   notes?: string;
   priority: "LOW" | "MEDIUM" | "HIGH";
   status?: "WANT" | "SAVING" | "BOUGHT";
+  cardId?: string | null;
 }) {
   try {
     await getCurrentUserOrThrow();
 
     const price = data.price ? parseFloat(data.price) : null;
 
-    await prisma.wishlistItem.create({
+    const item = await prisma.wishlistItem.create({
       data: {
         name: data.name,
         price: price,
@@ -67,13 +70,14 @@ export async function createWishlistItemAction(data: {
         notes: data.notes || null,
         priority: data.priority,
         status: data.status || "WANT",
+        cardId: data.cardId || null,
       },
     });
 
     revalidatePath("/wishlist");
     revalidatePath("/dashboard");
 
-    return { success: true, message: "Item added to wishlist! 🎁" };
+    return { success: true, message: "Item added to wishlist! 🎁", id: item.id };
   } catch (error) {
     console.error("Create wishlist error:", error);
     throw new Error("Failed to add item to wishlist");

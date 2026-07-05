@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import { navigationItems } from "@/lib/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -28,23 +29,31 @@ export function AppSidebar({
   defaultOpen = true,
 }: AppSidebarProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const pathname = usePathname();
 
   const NavLinks = () => (
     <div className="space-y-1">
-      {navigationItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground",
-            !isOpen && "justify-center px-2",
-          )}
-          title={!isOpen ? item.name : undefined}
-        >
-          <item.icon className="h-4 w-4 flex-shrink-0" />
-          {isOpen && <span>{item.name}</span>}
-        </Link>
-      ))}
+      {navigationItems.map((item) => {
+        const isActive = pathname === item.href;
+        
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground",
+              isActive 
+                ? "bg-white-100" 
+                : "text-muted-foreground",
+              !isOpen && "justify-center px-2"
+            )}
+            title={!isOpen ? item.name : undefined}
+          >
+            <item.icon className="h-4 w-4 flex-shrink-0" />
+            {isOpen && <span>{item.name}</span>}
+          </Link>
+        );
+      })}
     </div>
   );
 
@@ -52,14 +61,14 @@ export function AppSidebar({
     <aside
       className={cn(
         "hidden md:flex flex-col border-r bg-card transition-all duration-300",
-        isOpen ? "w-64" : "w-16",
+        isOpen ? "w-64" : "w-16"
       )}
     >
       {/* Header with Toggle */}
       <div
         className={cn(
           "flex h-16 items-center border-b",
-          isOpen ? "px-6 justify-between" : "px-2 justify-center",
+          isOpen ? "px-6 justify-between" : "px-2 justify-center"
         )}
       >
         <div className="flex items-center gap-2">
@@ -69,7 +78,6 @@ export function AppSidebar({
           )}
         </div>
 
-        {/* Toggle Button - Now next to heart icon */}
         <Button
           variant="ghost"
           size="icon"

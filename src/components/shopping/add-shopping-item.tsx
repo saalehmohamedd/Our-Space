@@ -21,15 +21,13 @@ import {
   Apple,
   Home,
   Package,
-  Hash,
+  DollarSign,
+  CreditCard,
+  CheckCircle2,
 } from "lucide-react";
 import { createShoppingItemAction } from "@/app/actions/shopping";
-
-interface ShoppingFormInputs {
-  name: string;
-  category: string;
-  quantity: string;
-}
+import { showToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 const categories = [
   { value: "groceries", label: "Groceries", icon: Apple, color: "text-green-500" },
@@ -38,32 +36,58 @@ const categories = [
   { value: "other", label: "Other", icon: ShoppingBag, color: "text-orange-500" },
 ];
 
-export function AddShoppingItem() {
+interface AddShoppingItemProps {
+  cards?: Array<{
+    id: string;
+    nickname: string;
+    brand: string;
+    last4: string;
+    colorTheme: string;
+    balance: string;
+  }>;
+}
+
+export function AddShoppingItem({ cards = [] }: AddShoppingItemProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("groceries");
+  const [selectedCardId, setSelectedCardId] = useState("");
 
-  const { register, handleSubmit, reset, watch } = useForm<ShoppingFormInputs>({
-    defaultValues: {
-      quantity: "1",
-    },
+  const { register, handleSubmit, reset, watch } = useForm({
+    defaultValues: { name: "", quantity: "1", cost: "" },
   });
 
   const watchName = watch("name");
+  const watchCost = watch("cost");
+  const safeCards = Array.isArray(cards) ? cards : [];
 
-  const onSubmit = async (data: ShoppingFormInputs) => {
+  const getCardGradient = (colorTheme: string) => {
+    const gradients: Record<string, string> = {
+      indigo: "from-indigo-600 to-blue-500", rose: "from-rose-600 to-orange-400",
+      emerald: "from-emerald-600 to-teal-500", violet: "from-violet-600 to-fuchsia-500",
+      amber: "from-amber-600 to-red-500", slate: "from-slate-700 to-gray-500",
+    };
+    return gradients[colorTheme] || gradients.indigo;
+  };
+
+  const onSubmit = async (data: any) => {
     try {
       setSubmitting(true);
+      // Only create the item - transaction happens when checked
       await createShoppingItemAction({
         name: data.name,
-        category: data.category || undefined,
+        category: selectedCategory || undefined,
         quantity: parseInt(data.quantity) || 1,
+        cost: data.cost ? parseFloat(data.cost) : undefined,
+        cardId: selectedCardId || undefined,
       });
+
+      showToast.success("Item added to shopping list 🛒");
       reset();
+      setSelectedCardId("");
       setOpen(false);
     } catch (err) {
-      console.error(err);
-      alert("Failed to add item.");
+      showToast.error("Failed to add item");
     } finally {
       setSubmitting(false);
     }
@@ -78,7 +102,6 @@ export function AddShoppingItem() {
         </Button>
       </DialogTrigger>
       <DialogContent className="w-[92vw] max-w-[425px] rounded-2xl p-0 gap-0 overflow-hidden border-0 shadow-2xl">
-        {/* Header */}
         <div className="relative bg-gradient-to-br from-emerald-400 to-teal-500 p-6 text-white">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="relative flex items-center gap-3">
@@ -98,66 +121,82 @@ export function AddShoppingItem() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Item Name */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Item Name
-              </Label>
-              <Input
-                required
-                placeholder="What do you need?"
-                className="w-full border-2 focus:border-emerald-400 transition"
-                {...register("name")}
-              />
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">Item Name</Label>
+              <Input required placeholder="What do you need?" className="w-full border-2 focus:border-emerald-400 transition" {...register("name")} />
             </div>
 
-            {/* Category Selection */}
+            {/* Category */}
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Category
-              </Label>
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">Category</Label>
               <div className="grid grid-cols-4 gap-2">
                 {categories.map((cat) => {
                   const Icon = cat.icon;
-                  const isSelected = selectedCategory === cat.value;
                   return (
-                    <button
-                      key={cat.value}
-                      type="button"
-                      onClick={() => setSelectedCategory(cat.value)}
+                    <button key={cat.value} type="button" onClick={() => setSelectedCategory(cat.value)}
                       className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
-                        isSelected
-                          ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 shadow-md"
+                        selectedCategory === cat.value 
+                          ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 shadow-md" 
                           : "border-transparent bg-muted/30 hover:bg-muted/50"
-                      }`}
-                    >
+                      }`}>
                       <Icon className={`h-4 w-4 ${cat.color}`} />
                       <span className="text-[10px] font-medium">{cat.label}</span>
                     </button>
                   );
                 })}
               </div>
-              <input type="hidden" {...register("category")} value={selectedCategory} />
             </div>
 
-            {/* Quantity */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Quantity
-              </Label>
-              <Input
-                type="number"
-                min="1"
-                className="w-full border-2 focus:border-emerald-400 transition"
-                {...register("quantity")}
-              />
+            {/* Quantity & Cost */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Quantity</Label>
+                <Input type="number" min="1" className="w-full border-2 focus:border-emerald-400 transition" {...register("quantity")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" /> Cost ($)
+                </Label>
+                <Input type="number" step="0.01" min="0" placeholder="0.00" className="w-full border-2 focus:border-emerald-400 transition" {...register("cost")} />
+              </div>
             </div>
 
-            <Button
-              type="submit"
-              disabled={submitting || !watchName}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Add to List
+            {/* Card Picker - Only to link card, no transaction yet */}
+            {watchCost && parseFloat(watchCost) > 0 && safeCards.length > 0 && (
+              <div className="space-y-2 p-3 rounded-xl bg-muted/30 border-2 border-dashed">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <CreditCard className="h-3 w-3 text-indigo-400" /> Link Card (Optional)
+                </Label>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  Amount will be deducted when you check this item as bought
+                </p>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {safeCards.map((card) => (
+                    <button key={card.id} type="button"
+                      onClick={() => setSelectedCardId(selectedCardId === card.id ? "" : card.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 p-2.5 rounded-lg border transition-all text-left",
+                        selectedCardId === card.id
+                          ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 shadow-sm"
+                          : "border-transparent bg-background hover:bg-muted/50 dark:hover:bg-muted/30"
+                      )}>
+                      <div className={cn("w-9 h-6 rounded bg-gradient-to-br flex-shrink-0", getCardGradient(card.colorTheme))} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{card.nickname}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          •••• {card.last4} • ${parseFloat(card.balance).toFixed(2)}
+                        </p>
+                      </div>
+                      {selectedCardId === card.id && (
+                        <CheckCircle2 className="h-4 w-4 text-indigo-500 flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button type="submit" disabled={submitting || !watchName} className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg">
+              <Sparkles className="mr-2 h-4 w-4" /> Add to List
             </Button>
           </form>
         </div>
