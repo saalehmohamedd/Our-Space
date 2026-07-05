@@ -2,43 +2,41 @@
 
 import React, { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Heart, Trash2, Calendar, MapPin, DollarSign, Star } from "lucide-react";
+import { Heart, Trash2, CalendarDays, MapPin, DollarSign, CreditCard } from "lucide-react";
 import { toggleFavoriteDateAction, archiveDateAction } from "@/app/actions/dates";
 import { DateEditDialog } from "./date-edit-dialog";
 import { Badge } from "@/components/ui/badge";
+import { showToast } from "@/lib/toast";
 
-interface DateCardProps {
-  item: {
-    id: string;
-    title: string;
-    activity: string;
-    location: string;
-    scheduledAt: Date;
-    costEstimate: any;
-    status: "IDEA" | "PLANNED" | "COMPLETED";
-    rating: number | null;
-    notes: string | null;
-    isFavorite: boolean;
-    isArchived: boolean;
-  };
+interface DateItemType {
+  id: string;
+  title: string;
+  location: string | null;
+  date: string;
+  cost: string | null;
+  rating: number | null;
+  notes: string | null;
+  isFavorite: boolean;
+  isArchived: boolean;
+  cardId?: string | null;
 }
 
-export function DateCard({ item }: DateCardProps) {
+interface DateCardProps {
+  item: DateItemType;
+  cards?: Array<{
+    id: string;
+    nickname: string;
+    brand: string;
+    last4: string;
+    colorTheme: string;
+    balance: string;
+  }>;
+}
+
+export function DateCard({ item, cards = [] }: DateCardProps) {
   const [editOpen, setEditOpen] = useState(false);
 
-  const statusStyles = {
-    IDEA: "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400",
-    PLANNED: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
-    COMPLETED: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400",
-  };
-
-  const statusLabels = {
-    IDEA: "Spark Idea",
-    PLANNED: "Locked In",
-    COMPLETED: "Cherished Capsule",
-  };
-
-  const formattedDate = new Date(item.scheduledAt).toLocaleDateString("en-US", {
+  const formattedDate = new Date(item.date).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -49,53 +47,40 @@ export function DateCard({ item }: DateCardProps) {
       <Card className="bg-card/70 backdrop-blur-sm border hover:shadow-md transition flex flex-col w-full relative group">
         <CardContent className="pt-5 space-y-3 flex-grow cursor-pointer" onClick={() => setEditOpen(true)}>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-              <Calendar className="h-3.5 w-3.5 text-rose-500" />
+            <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+              <CalendarDays className="h-3.5 w-3.5 text-rose-500" />
               <span>{formattedDate}</span>
             </div>
-            <Badge className={statusStyles[item.status]} variant="outline">
-              {statusLabels[item.status]}
-            </Badge>
+            <Badge variant="outline">Date Night</Badge>
           </div>
 
-          <div className="space-y-1">
-            <h3 className="font-bold tracking-tight text-xl group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors line-clamp-1">
-              {item.title}
-            </h3>
-            <p className="text-sm text-slate-500 font-medium line-clamp-1 italic">
-              {item.activity}
-            </p>
-          </div>
+          <h3 className="font-bold tracking-tight text-xl group-hover:text-rose-500 transition-colors line-clamp-1">
+            {item.title}
+          </h3>
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground font-semibold">
-            <div className="flex items-center gap-0.5">
-              <MapPin className="h-3.5 w-3.5 text-zinc-400" />
+          {item.location && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 text-rose-400" />
               <span className="line-clamp-1">{item.location}</span>
-            </div>
-            <div className="flex items-center gap-0.5">
-              <DollarSign className="h-3.5 w-3.5 text-zinc-400" />
-              <span>{item.costEstimate ? Number(item.costEstimate).toLocaleString() : "TBD"}</span>
-            </div>
-          </div>
-
-          {/* 🌟 RATING ACCORDION DISPLAY */}
-          {item.status === "COMPLETED" && item.rating && (
-            <div className="flex items-center gap-0.5 pt-0.5">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-4 w-4 ${
-                    i < (item.rating || 0)
-                      ? "text-amber-400 fill-amber-400"
-                      : "text-zinc-200 dark:text-zinc-800"
-                  }`}
-                />
-              ))}
             </div>
           )}
 
+          <div className="flex items-center gap-3">
+            {item.cost && parseFloat(item.cost) > 0 && (
+              <div className="flex items-center gap-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                <DollarSign className="h-3.5 w-3.5" />
+                <span>${parseFloat(item.cost).toFixed(2)}</span>
+              </div>
+            )}
+            {item.cardId && (
+              <span title="Linked to card">
+                <CreditCard className="h-3.5 w-3.5 text-indigo-400" />
+              </span>
+            )}
+          </div>
+
           {item.notes && (
-            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 bg-muted/40 p-2.5 rounded-lg border border-dashed">
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 bg-muted/30 p-2.5 rounded-lg border border-dashed">
               {item.notes}
             </p>
           )}
@@ -107,6 +92,7 @@ export function DateCard({ item }: DateCardProps) {
             onClick={async (e) => {
               e.stopPropagation();
               await toggleFavoriteDateAction(item.id, item.isFavorite);
+              showToast.success(item.isFavorite ? "Removed from favorites 💔" : "Added to favorites ❤️");
             }}
             className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-rose-500 transition py-1"
           >
@@ -118,8 +104,9 @@ export function DateCard({ item }: DateCardProps) {
             type="button"
             onClick={async (e) => {
               e.stopPropagation();
-              if (confirm("Send this date capsule archive down to vault records?")) {
+              if (confirm("Archive this date?")) {
                 await archiveDateAction(item.id);
+                showToast.success("Date archived");
               }
             }}
             className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-destructive transition py-1"
@@ -130,7 +117,7 @@ export function DateCard({ item }: DateCardProps) {
         </CardFooter>
       </Card>
 
-      <DateEditDialog item={item} open={editOpen} onOpenChange={setEditOpen} />
+      <DateEditDialog item={item} cards={cards} open={editOpen} onOpenChange={setEditOpen} />
     </>
   );
 }
