@@ -1,5 +1,4 @@
 // src/app/(app)/shopping/page.tsx
-
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { Separator } from "@/components/ui/separator";
@@ -47,6 +46,7 @@ export default async function ShoppingPage({
   else if (sort === "az") orderBy = { name: "asc" };
   else if (sort === "za") orderBy = { name: "desc" };
 
+  // Fetch ALL cards (shared wallet)
   const [items, cards] = await Promise.all([
     prisma.shoppingListItem.findMany({ where, orderBy }),
     prisma.card.findMany({
@@ -63,7 +63,6 @@ export default async function ShoppingPage({
     }),
   ]);
 
-  // Serialize both
   const serializedItems = items.map(serializeItem);
   const serializedCards = cards.map(serializeCard);
 

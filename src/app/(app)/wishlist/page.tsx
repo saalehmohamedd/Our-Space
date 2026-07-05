@@ -1,5 +1,4 @@
 // src/app/(app)/wishlist/page.tsx
-
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth-guard";
@@ -45,7 +44,6 @@ export default async function WishlistPage({
   const { sort, filter } = await searchParams;
 
   const where: any = { isArchived: false };
-  
   if (filter === "favorites") where.isFavorite = true;
   else if (filter === "active") where.status = { in: ["WANT", "SAVING"] };
   else if (filter === "completed") where.status = "BOUGHT";
@@ -55,11 +53,11 @@ export default async function WishlistPage({
   else if (sort === "az") orderBy = { name: "asc" };
   else if (sort === "za") orderBy = { name: "desc" };
 
-  // Fetch both items and cards
+  // Fetch ALL cards (shared wallet)
   const [items, cards] = await Promise.all([
     prisma.wishlistItem.findMany({ where, orderBy }),
     prisma.card.findMany({
-      where: { ownerId: user.id, isArchived: false },
+      where: { isArchived: false },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -75,8 +73,6 @@ export default async function WishlistPage({
   const serializedItems = items.map(serializeWishlistItem);
   const serializedCards = cards.map(serializeCard);
 
-  console.log("Cards count:", serializedCards.length); // Debug - check if cards exist
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -87,7 +83,6 @@ export default async function WishlistPage({
           </p>
         </div>
         <div>
-          {/* Pass cards to creation dialog */}
           <WishlistCreationDialog cards={serializedCards} />
         </div>
       </div>

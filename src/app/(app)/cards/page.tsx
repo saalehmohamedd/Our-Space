@@ -4,13 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth-guard";
 import { Separator } from "@/components/ui/separator";
 import { CardsClient } from "@/components/cards/cards-client";
-import { serializeCard } from "@/lib/serialize"; // Importing your centralized utility
+import { serializeCard } from "@/lib/serialize";
 
 export default async function CardsPage() {
-  const user = await getCurrentUserOrThrow();
+  await getCurrentUserOrThrow();
 
+  // Fetch ALL non-archived cards (shared wallet)
   const cards = await prisma.card.findMany({
-    where: { ownerId: user.id, isArchived: false },
+    where: { isArchived: false },
     include: {
       transactions: {
         orderBy: { date: "desc" },
@@ -20,7 +21,6 @@ export default async function CardsPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  // Using your lib function to safely serialize Decimals and Dates
   const serializedCards = cards.map(serializeCard);
   
   const totalBalance = serializedCards.reduce(
@@ -32,7 +32,7 @@ export default async function CardsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Cards</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Shared Cards</h1>
           <p className="text-muted-foreground">
             {serializedCards.length} {serializedCards.length === 1 ? "card" : "cards"} • Total balance: ${totalBalance.toFixed(2)}
           </p>

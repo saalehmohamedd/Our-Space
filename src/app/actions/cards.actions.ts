@@ -62,10 +62,8 @@ export async function updateCard(
   input: { nickname?: string; colorTheme?: string; expiryMonth?: number; expiryYear?: number }
 ) {
   try {
-    const user = await getCurrentUserOrThrow();
-    const card = await prisma.card.findUnique({ where: { id } });
-    if (!card || card.ownerId !== user.id) throw new Error("Unauthorized");
-
+    await getCurrentUserOrThrow();
+    // Removed ownership check - anyone can update any card
     await prisma.card.update({ where: { id }, data: input });
     revalidatePath(`/cards/${id}`);
     revalidatePath("/cards");
@@ -111,10 +109,8 @@ export async function createTransaction(input: {
   note?: string;
 }) {
   try {
-    const user = await getCurrentUserOrThrow();
-    const card = await prisma.card.findUnique({ where: { id: input.cardId } });
-    if (!card || card.ownerId !== user.id) throw new Error("Unauthorized");
-
+    await getCurrentUserOrThrow();
+    // Removed ownership check - anyone can create transactions on any card
     await prisma.$transaction([
       prisma.transaction.create({
         data: {
@@ -130,7 +126,6 @@ export async function createTransaction(input: {
         data: { balance: { decrement: input.amount } },
       }),
     ]);
-
     revalidatePath(`/cards/${input.cardId}`);
     revalidatePath("/cards");
     return { success: true, message: "Transaction added" };
@@ -173,54 +168,29 @@ export async function setMonthlyIncome(input: {
   note?: string;
 }) {
   try {
-    const user = await getCurrentUserOrThrow();
-    const card = await prisma.card.findUnique({ where: { id: input.cardId } });
-    if (!card || card.ownerId !== user.id) throw new Error("Unauthorized");
-
+    await getCurrentUserOrThrow();
+    // Removed ownership check
     const existing = await prisma.monthlyIncome.findUnique({
-      where: {
-        cardId_month_year: {
-          cardId: input.cardId,
-          month: input.month,
-          year: input.year,
-        },
-      },
+      where: { cardId_month_year: { cardId: input.cardId, month: input.month, year: input.year } },
     });
 
     if (existing) {
       const difference = input.amount - Number(existing.amount);
       await prisma.$transaction([
-        prisma.monthlyIncome.update({
-          where: { id: existing.id },
-          data: { amount: input.amount, note: input.note || null },
-        }),
-        prisma.card.update({
-          where: { id: input.cardId },
-          data: { balance: { increment: difference } },
-        }),
+        prisma.monthlyIncome.update({ where: { id: existing.id }, data: { amount: input.amount, note: input.note || null } }),
+        prisma.card.update({ where: { id: input.cardId }, data: { balance: { increment: difference } } }),
       ]);
     } else {
       await prisma.$transaction([
         prisma.monthlyIncome.create({
-          data: {
-            cardId: input.cardId,
-            amount: input.amount,
-            month: input.month,
-            year: input.year,
-            note: input.note || null,
-          },
+          data: { cardId: input.cardId, amount: input.amount, month: input.month, year: input.year, note: input.note || null },
         }),
-        prisma.card.update({
-          where: { id: input.cardId },
-          data: { balance: { increment: input.amount } },
-        }),
+        prisma.card.update({ where: { id: input.cardId }, data: { balance: { increment: input.amount } } }),
       ]);
     }
-
     revalidatePath(`/cards/${input.cardId}`);
     return { success: true, message: "Monthly income updated!" };
   } catch (error) {
-    console.error("Set monthly income error:", error);
     throw new Error("Failed to set monthly income");
   }
 }

@@ -1,3 +1,4 @@
+// src/app/(app)/dates/page.tsx
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { Separator } from "@/components/ui/separator";
@@ -50,6 +51,7 @@ export default async function DatesPage({
   else if (sort === "az") orderBy = { title: "asc" };
   else if (sort === "za") orderBy = { title: "desc" };
 
+  // Fetch ALL cards (shared wallet)
   const [items, cards] = await Promise.all([
     prisma.dateOuting.findMany({ where, orderBy }),
     prisma.card.findMany({
