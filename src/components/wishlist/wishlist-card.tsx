@@ -7,6 +7,7 @@ import { Heart, Trash2, ExternalLink } from "lucide-react";
 import { toggleFavoriteWishlistAction, deleteWishlistItemAction } from "@/app/actions/wishlist";
 import { WishlistEditDialog } from "./wishlist-edit-dialog";
 import { Badge } from "@/components/ui/badge";
+import { showToast } from "@/lib/toast";
 
 interface WishlistItemProps {
   item: {
@@ -19,10 +20,19 @@ interface WishlistItemProps {
     status: "WANT" | "SAVING" | "BOUGHT";
     isFavorite: boolean;
     isArchived: boolean;
+    cardId?: string | null;
   };
+  cards?: Array<{
+    id: string;
+    nickname: string;
+    brand: string;
+    last4: string;
+    colorTheme: string;
+    balance: string;
+  }>;
 }
 
-export function WishlistCard({ item }: WishlistItemProps) {
+export function WishlistCard({ item, cards = [] }: WishlistItemProps) {
   const [editOpen, setEditOpen] = useState(false);
 
   const priorityColors = {
@@ -52,13 +62,8 @@ export function WishlistCard({ item }: WishlistItemProps) {
             </div>
             
             {item.link && (
-              <a
-                href={item.link}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-muted-foreground hover:text-indigo-500 transition p-1"
-              >
+              <a href={item.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                className="text-muted-foreground hover:text-indigo-500 transition p-1">
                 <ExternalLink className="h-4 w-4" />
               </a>
             )}
@@ -86,6 +91,7 @@ export function WishlistCard({ item }: WishlistItemProps) {
             onClick={async (e) => {
               e.stopPropagation();
               await toggleFavoriteWishlistAction(item.id, item.isFavorite);
+              showToast.success(item.isFavorite ? "Removed from favorites 💔" : "Added to favorites ❤️");
             }}
             className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-rose-500 transition py-1"
           >
@@ -99,6 +105,7 @@ export function WishlistCard({ item }: WishlistItemProps) {
               e.stopPropagation();
               if (confirm("Remove this item from wishlist?")) {
                 await deleteWishlistItemAction(item.id);
+                showToast.success("Item removed");
               }
             }}
             className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-destructive transition py-1"
@@ -109,7 +116,12 @@ export function WishlistCard({ item }: WishlistItemProps) {
         </CardFooter>
       </Card>
 
-      <WishlistEditDialog item={item} open={editOpen} onOpenChange={setEditOpen} />
+      <WishlistEditDialog 
+        item={item} 
+        cards={cards}
+        open={editOpen} 
+        onOpenChange={setEditOpen} 
+      />
     </>
   );
 }

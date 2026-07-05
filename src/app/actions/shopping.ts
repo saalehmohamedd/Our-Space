@@ -7,39 +7,27 @@ import { revalidatePath } from "next/cache";
 
 export async function createShoppingItemAction(data: {
   name: string;
-  category?: string; 
+  category?: string;
   quantity: number;
+  cost?: number;
+  cardId?: string;
 }) {
   try {
     await getCurrentUserOrThrow();
-
     await prisma.shoppingListItem.create({
       data: {
         name: data.name,
-        category: data.category || null, // Convert undefined to null for Prisma
+        category: data.category || null,
         quantity: data.quantity || 1,
+        cost: data.cost || null,
+        cardId: data.cardId || null,
       },
     });
-
     revalidatePath("/shopping");
-    revalidatePath("/dashboard");
-    
-    return { success: true, message: "Item added to shopping list 🛒" };
+    return { success: true };
   } catch (error) {
-    console.error("Create shopping item error:", error);
-    throw new Error("Failed to add shopping item");
+    throw new Error("Failed to add item");
   }
-}
-
-export async function toggleShoppingItemAction(id: string, currentState: boolean) {
-  await getCurrentUserOrThrow();
-
-  await prisma.shoppingListItem.update({
-    where: { id },
-    data: { checked: !currentState },
-  });
-
-  revalidatePath("/shopping");
 }
 
 export async function updateShoppingItemAction(
@@ -48,38 +36,61 @@ export async function updateShoppingItemAction(
     name: string;
     category?: string;
     quantity: number;
+    cost?: number;
+    cardId?: string;
   }
 ) {
-  await getCurrentUserOrThrow();
+  try {
+    await getCurrentUserOrThrow();
+    await prisma.shoppingListItem.update({
+      where: { id },
+      data: {
+        name: data.name,
+        category: data.category || null,
+        quantity: data.quantity,
+        cost: data.cost || null,
+        cardId: data.cardId || null,
+      },
+    });
+    revalidatePath("/shopping");
+    return { success: true };
+  } catch (error) {
+    throw new Error("Failed to update item");
+  }
+}
 
-  await prisma.shoppingListItem.update({
-    where: { id },
-    data: {
-      name: data.name,
-      category: data.category || null,
-      quantity: data.quantity,
-    },
-  });
-
-  revalidatePath("/shopping");
+export async function toggleShoppingItemAction(id: string, currentState: boolean) {
+  try {
+    await getCurrentUserOrThrow();
+    await prisma.shoppingListItem.update({
+      where: { id },
+      data: { checked: !currentState },
+    });
+    revalidatePath("/shopping");
+    return { success: true };
+  } catch (error) {
+    throw new Error("Failed to update item");
+  }
 }
 
 export async function deleteShoppingItemAction(id: string) {
-  await getCurrentUserOrThrow();
-
-  await prisma.shoppingListItem.delete({
-    where: { id },
-  });
-
-  revalidatePath("/shopping");
+  try {
+    await getCurrentUserOrThrow();
+    await prisma.shoppingListItem.delete({ where: { id } });
+    revalidatePath("/shopping");
+    return { success: true };
+  } catch (error) {
+    throw new Error("Failed to delete item");
+  }
 }
 
 export async function clearCheckedItemsAction() {
-  await getCurrentUserOrThrow();
-
-  await prisma.shoppingListItem.deleteMany({
-    where: { checked: true },
-  });
-
-  revalidatePath("/shopping");
+  try {
+    await getCurrentUserOrThrow();
+    await prisma.shoppingListItem.deleteMany({ where: { checked: true } });
+    revalidatePath("/shopping");
+    return { success: true };
+  } catch (error) {
+    throw new Error("Failed to clear items");
+  }
 }
