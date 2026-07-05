@@ -15,20 +15,22 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  PlusCircle,
   Sparkles,
-  Loader2,
   Heart,
   Calendar,
   MapPin,
   Activity,
   DollarSign,
   StickyNote,
-  Lightbulb,
-  Clock,
+  CreditCard,
   CheckCircle2,
-  PlusCircle,
+  Loader2,
 } from "lucide-react";
 import { createDateAction } from "@/app/actions/dates";
+import { createTransaction } from "@/app/actions/cards.actions";
+import { showToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 interface DateFormInputs {
   title: string;
@@ -36,325 +38,181 @@ interface DateFormInputs {
   location: string;
   scheduledAt: string;
   costEstimate: string;
-  status: "IDEA" | "PLANNED" | "COMPLETED";
+  status: string;
   notes: string;
 }
 
-const statusConfig = {
-  IDEA: {
-    label: "Spark Idea",
-    icon: Lightbulb,
-    color: "text-amber-500",
-    bg: "bg-amber-100 dark:bg-amber-900/30",
-    border: "border-amber-300 dark:border-amber-700",
-    gradient: "from-amber-400 via-orange-400 to-amber-500",
-    description: "Just a fun thought",
-  },
-  PLANNED: {
-    label: "Locked In",
-    icon: Clock,
-    color: "text-rose-500",
-    bg: "bg-rose-100 dark:bg-rose-900/30",
-    border: "border-rose-300 dark:border-rose-700",
-    gradient: "from-rose-400 via-pink-400 to-rose-500",
-    description: "Scheduled & ready",
-  },
-  COMPLETED: {
-    label: "Cherished",
-    icon: CheckCircle2,
-    color: "text-purple-500",
-    bg: "bg-purple-100 dark:bg-purple-900/30",
-    border: "border-purple-300 dark:border-purple-700",
-    gradient: "from-purple-400 via-violet-400 to-purple-500",
-    description: "Already enjoyed",
-  },
-};
+interface CardType {
+  id: string;
+  nickname: string;
+  brand: string;
+  last4: string;
+  colorTheme: string;
+  balance: string;
+}
 
-export function DateCreationDialog() {
+interface DateCreationDialogProps {
+  cards?: CardType[];
+}
+
+export function DateCreationDialog({ cards = [] }: DateCreationDialogProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<"IDEA" | "PLANNED" | "COMPLETED">("IDEA");
+  const [selectedCardId, setSelectedCardId] = useState("");
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-  } = useForm<DateFormInputs>({
+  const { register, handleSubmit, reset, watch } = useForm<DateFormInputs>({
     defaultValues: {
-      status: "IDEA",
       scheduledAt: new Date().toISOString().split("T")[0],
+      status: "PLANNED",
     },
-    mode: "onChange",
   });
 
   const watchTitle = watch("title");
-  const watchActivity = watch("activity");
+  const watchCost = watch("costEstimate");
+  const safeCards = Array.isArray(cards) ? cards : [];
 
-  const handleStatusSelect = (status: "IDEA" | "PLANNED" | "COMPLETED") => {
-    setSelectedStatus(status);
-    setValue("status", status);
+  const getCardGradient = (colorTheme: string) => {
+    const gradients: Record<string, string> = {
+      indigo: "from-indigo-600 to-blue-500", rose: "from-rose-600 to-orange-400",
+      emerald: "from-emerald-600 to-teal-500", violet: "from-violet-600 to-fuchsia-500",
+      amber: "from-amber-600 to-red-500", slate: "from-slate-700 to-gray-500",
+    };
+    return gradients[colorTheme] || gradients.indigo;
   };
 
   const onSubmit = async (data: DateFormInputs) => {
     try {
       setSubmitting(true);
-      await createDateAction(data);
+      const result = await createDateAction({
+        ...data,
+        costEstimate: data.costEstimate || undefined,
+        cardId: selectedCardId || undefined,
+      } as any);
+
+      // If cost is set and card selected, create transaction
+      if (data.costEstimate && parseFloat(data.costEstimate) > 0 && selectedCardId) {
+        try {
+          await createTransaction({
+            cardId: selectedCardId,
+            amount: parseFloat(data.costEstimate),
+            sourceType: "DATE_OUTING",
+            sourceId: result.id,
+            note: `Date: ${data.title}`,
+          });
+          showToast.success("Date planned & transaction recorded! 💳", `$${parseFloat(data.costEstimate).toFixed(2)} deducted`);
+        } catch (err) {
+          showToast.success("Date added but transaction failed");
+        }
+      } else {
+        showToast.success("Date night planned! 💝");
+      }
+
       reset();
-      setSelectedStatus("IDEA");
+      setSelectedCardId("");
       setOpen(false);
     } catch (err) {
-      console.error(err);
-      alert("Failed to pitch date night idea.");
+      showToast.error("Failed to plan date");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const currentStatus = statusConfig[selectedStatus];
-  const StatusIcon = currentStatus.icon;
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 transition-all duration-300">
+        <Button className="gap-2 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white shadow-lg shadow-rose-500/25">
           <Heart className="h-4 w-4" />
           Pitch Date Night
         </Button>
       </DialogTrigger>
       <DialogContent className="w-[92vw] max-w-[500px] rounded-2xl p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className={`relative bg-gradient-to-r ${currentStatus.gradient} p-6 sm:p-8 text-white`}>
+        <div className="relative bg-gradient-to-br from-rose-400 via-pink-400 to-rose-500 p-6 sm:p-8 text-white">
           <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
-          
           <div className="relative space-y-2">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
                 <Heart className="h-5 w-5" />
               </div>
-              <DialogTitle className="text-xl font-bold">
-                Pitch New Date
-              </DialogTitle>
+              <DialogTitle className="text-xl font-bold">Pitch New Date</DialogTitle>
             </div>
             <DialogDescription className="text-white/80 text-sm max-w-xs">
               Plan a romantic evening, spontaneous adventure, or special celebration
             </DialogDescription>
           </div>
-
-          {/* Preview card */}
-          {(watchTitle || watchActivity) && (
-            <div className="mt-4 p-3 bg-white/10 backdrop-blur-sm rounded-xl">
-              <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">
-                Date Preview
-              </p>
-              <p className="text-lg font-bold">
-                {watchTitle || "Untitled Date"}
-              </p>
-              {watchActivity && (
-                <p className="text-sm text-white/80 mt-1 flex items-center gap-1">
-                  <Activity className="h-3.5 w-3.5" />
-                  {watchActivity}
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Form */}
         <div className="p-5 sm:p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Title */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="title"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-              >
-                <Heart className="h-3 w-3 text-rose-400" />
-                Date Title
-              </Label>
-              <Input
-                id="title"
-                required
-                placeholder="Candlelit Sushi Night..."
-                className="w-full border-2 focus:border-rose-400 focus:ring-rose-400/20 transition"
-                {...register("title", { required: "Title is required" })}
-              />
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">Date Title</Label>
+              <Input required placeholder="Candlelit Sushi Night..." className="w-full border-2 focus:border-rose-400 transition" {...register("title")} />
             </div>
 
-            {/* Activity & Location */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="activity"
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-                >
-                  <Activity className="h-3 w-3 text-purple-400" />
-                  Activity
-                </Label>
-                <Input
-                  id="activity"
-                  required
-                  placeholder="Dinner & arcade..."
-                  className="w-full border-2 focus:border-rose-400 focus:ring-rose-400/20 transition"
-                  {...register("activity", { required: "Activity is required" })}
-                />
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Activity</Label>
+                <Input required placeholder="Dinner & arcade..." className="w-full border-2 focus:border-rose-400 transition" {...register("activity")} />
               </div>
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="location"
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-                >
-                  <MapPin className="h-3 w-3 text-rose-400" />
-                  Venue
-                </Label>
-                <Input
-                  id="location"
-                  required
-                  placeholder="Miyako Sushi Bar"
-                  className="w-full border-2 focus:border-rose-400 focus:ring-rose-400/20 transition"
-                  {...register("location", { required: "Location is required" })}
-                />
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Venue</Label>
+                <Input required placeholder="Miyako Sushi Bar" className="w-full border-2 focus:border-rose-400 transition" {...register("location")} />
               </div>
             </div>
 
-            {/* Date & Budget */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="scheduledAt"
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-                >
-                  <Calendar className="h-3 w-3 text-blue-400" />
-                  Target Date
-                </Label>
-                <Input
-                  id="scheduledAt"
-                  type="date"
-                  required
-                  className="w-full border-2 focus:border-rose-400 focus:ring-rose-400/20 transition"
-                  {...register("scheduledAt", { required: "Date is required" })}
-                />
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Date</Label>
+                <Input type="date" required className="w-full border-2 focus:border-rose-400 transition" {...register("scheduledAt")} />
               </div>
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="costEstimate"
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-                >
-                  <DollarSign className="h-3 w-3 text-emerald-400" />
-                  Budget ($)
+                <Label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <DollarSign className="h-3 w-3 text-emerald-400" /> Budget ($)
                 </Label>
-                <Input
-                  id="costEstimate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Optional"
-                  className="w-full border-2 focus:border-rose-400 focus:ring-rose-400/20 transition"
-                  {...register("costEstimate")}
-                />
+                <Input type="number" step="0.01" min="0" placeholder="0.00" className="w-full border-2 focus:border-rose-400 transition" {...register("costEstimate")} />
               </div>
             </div>
 
-            {/* Status Selection */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3 text-amber-400" />
-                Date Status
-              </Label>
-              <div className="grid grid-cols-3 gap-2">
-                {Object.entries(statusConfig).map(([key, config]) => {
-                  const Icon = config.icon;
-                  const isSelected = selectedStatus === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleStatusSelect(key as "IDEA" | "PLANNED" | "COMPLETED")}
-                      className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-200 ${
-                        isSelected
-                          ? `${config.border} ${config.bg} shadow-md scale-105`
-                          : "border-transparent bg-muted/30 hover:bg-muted/50"
-                      }`}
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          isSelected ? config.bg : "bg-muted"
-                        }`}
-                      >
-                        <Icon className={`h-4 w-4 ${isSelected ? config.color : "text-muted-foreground"}`} />
+            {/* Card Picker */}
+            {watchCost && parseFloat(watchCost) > 0 && safeCards.length > 0 && (
+              <div className="space-y-2 p-3 rounded-xl bg-muted/30 border-2 border-dashed">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <CreditCard className="h-3 w-3 text-indigo-400" /> Link Card (Optional)
+                </Label>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  Amount will be deducted from the selected card
+                </p>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {safeCards.map((card) => (
+                    <button key={card.id} type="button"
+                      onClick={() => setSelectedCardId(selectedCardId === card.id ? "" : card.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 p-2.5 rounded-lg border transition-all text-left",
+                        selectedCardId === card.id
+                          ? "border-rose-400 bg-rose-50 dark:bg-rose-950/20 shadow-sm"
+                          : "border-transparent bg-background hover:bg-muted/50"
+                      )}>
+                      <div className={cn("w-9 h-6 rounded bg-gradient-to-br flex-shrink-0", getCardGradient(card.colorTheme))} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{card.nickname}</p>
+                        <p className="text-[10px] text-muted-foreground">•••• {card.last4} • ${parseFloat(card.balance).toFixed(2)}</p>
                       </div>
-                      <span
-                        className={`text-xs font-medium ${
-                          isSelected ? config.color : "text-muted-foreground"
-                        }`}
-                      >
-                        {config.label}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground leading-tight text-center">
-                        {config.description}
-                      </span>
-                      {isSelected && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 border-2 border-background flex items-center justify-center">
-                          <CheckCircle2 className="h-3 w-3 text-white" />
-                        </div>
-                      )}
+                      {selectedCardId === card.id && <CheckCircle2 className="h-4 w-4 text-rose-500 flex-shrink-0" />}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-              <input type="hidden" {...register("status")} value={selectedStatus} />
-            </div>
+            )}
 
-            {/* Notes */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="notes"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-              >
-                <StickyNote className="h-3 w-3 text-amber-400" />
-                Extra Reminders
-              </Label>
-              <Textarea
-                id="notes"
-                placeholder="Dress codes, reservation details, special requests..."
-                className="w-full resize-none min-h-[80px] border-2 focus:border-rose-400 focus:ring-rose-400/20 transition"
-                rows={2}
-                {...register("notes")}
-              />
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">Notes</Label>
+              <Textarea placeholder="Dress codes, reservation details..." className="w-full resize-none min-h-[80px] border-2 focus:border-rose-400 transition" rows={2} {...register("notes")} />
             </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 transition-all duration-300"
-              disabled={submitting || !watchTitle}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Pitching Date...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Lock In Blueprint
-                </>
-              )}
+            <Button type="submit" disabled={submitting || !watchTitle} className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg">
+              {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Planning...</> : <><Sparkles className="mr-2 h-4 w-4" /> Lock In Blueprint</>}
             </Button>
           </form>
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 sm:px-6 py-3 bg-muted/30 border-t flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${currentStatus.color.replace('text', 'bg')}`} />
-            <span>{currentStatus.label} stage</span>
-          </div>
-          <span>
-            {watchTitle ? "Ready to save" : "Fill in date title"}
-          </span>
         </div>
       </DialogContent>
     </Dialog>
