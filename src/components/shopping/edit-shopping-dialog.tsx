@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -24,6 +23,7 @@ import {
   DollarSign,
   CreditCard,
   CheckCircle2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { updateShoppingItemAction } from "@/app/actions/shopping";
 import { createTransaction } from "@/app/actions/cards.actions";
@@ -38,6 +38,7 @@ interface ShoppingItem {
   checked: boolean;
   cost?: string | null;
   cardId?: string | null;
+  productUrl?: string | null;
 }
 
 interface EditShoppingDialogProps {
@@ -71,6 +72,7 @@ export function EditShoppingDialog({ item, cards = [], open, onOpenChange }: Edi
       name: item.name,
       quantity: item.quantity.toString(),
       cost: item.cost || "",
+      productUrl: item.productUrl || "",
     },
   });
 
@@ -80,6 +82,7 @@ export function EditShoppingDialog({ item, cards = [], open, onOpenChange }: Edi
         name: item.name,
         quantity: item.quantity.toString(),
         cost: item.cost || "",
+        productUrl: item.productUrl || "",
       });
       setSelectedCategory(item.category || "groceries");
       setSelectedCardId(item.cardId || "");
@@ -87,6 +90,7 @@ export function EditShoppingDialog({ item, cards = [], open, onOpenChange }: Edi
   }, [open, item, reset]);
 
   const watchCost = watch("cost");
+  const watchProductUrl = watch("productUrl");
   const safeCards = Array.isArray(cards) ? cards : [];
 
   const getCardGradient = (colorTheme: string) => {
@@ -107,6 +111,7 @@ export function EditShoppingDialog({ item, cards = [], open, onOpenChange }: Edi
         quantity: parseInt(data.quantity) || 1,
         cost: data.cost ? parseFloat(data.cost) : undefined,
         cardId: selectedCardId || undefined,
+        productUrl: data.productUrl || undefined,
       });
 
       // If item is already checked and has cost/card, create transaction
@@ -153,11 +158,48 @@ export function EditShoppingDialog({ item, cards = [], open, onOpenChange }: Edi
 
         <div className="p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Item Name */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">Item Name</Label>
               <Input required {...register("name")} className="border-2 focus:border-emerald-400 transition" />
             </div>
 
+            {/* Product Image URL with Live Preview */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-muted-foreground flex justify-between">
+                <span>Image URL</span>
+                <span className="text-[10px] font-normal lowercase opacity-70">(Optional)</span>
+              </Label>
+              <div className="flex gap-3">
+                <div className="h-10 w-10 rounded-md bg-muted border flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {watchProductUrl ? (
+                    <img 
+                      src={watchProductUrl} 
+                      alt="Preview" 
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        e.currentTarget.parentElement?.classList.add('fallback-icon');
+                      }}
+                      onLoad={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'block';
+                      }}
+                    />
+                  ) : (
+                    <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Input 
+                    placeholder="Paste direct image link (e.g., .jpg, .png)" 
+                    className="w-full border-2 focus:border-emerald-400 transition" 
+                    {...register("productUrl")} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Category */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">Category</Label>
               <div className="grid grid-cols-4 gap-2">
@@ -178,6 +220,7 @@ export function EditShoppingDialog({ item, cards = [], open, onOpenChange }: Edi
               </div>
             </div>
 
+            {/* Quantity & Cost */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">Quantity</Label>
@@ -223,11 +266,12 @@ export function EditShoppingDialog({ item, cards = [], open, onOpenChange }: Edi
               </div>
             )}
 
+            {/* Form Footer Actions */}
             <div className="flex gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 <X className="h-4 w-4 mr-1" /> Cancel
               </Button>
-              <Button type="submit" className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white" disabled={updating}>
+              <Button type="submit" className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg" disabled={updating}>
                 <Sparkles className="mr-2 h-4 w-4" /> Save
               </Button>
             </div>

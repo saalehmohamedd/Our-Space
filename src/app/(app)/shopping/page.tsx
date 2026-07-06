@@ -15,6 +15,7 @@ function serializeItem(item: any) {
     checked: item.checked,
     cost: item.cost?.toString() || null,
     cardId: item.cardId || null,
+    productUrl: item.productUrl || null, // ✅ Now mapped to your components
     createdAt: item.createdAt?.toISOString() || null,
   };
 }

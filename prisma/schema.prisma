@@ -142,6 +142,7 @@ model ShoppingListItem {
   name      String
   category  String?
   quantity  Int      @default(1)
+  productUrl       String?
   checked   Boolean  @default(false)
   cost   Decimal?
   cardId String?

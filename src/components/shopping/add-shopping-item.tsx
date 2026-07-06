@@ -1,4 +1,3 @@
-// src/components/shopping/add-shopping-item.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -7,7 +6,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
@@ -24,6 +22,7 @@ import {
   DollarSign,
   CreditCard,
   CheckCircle2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { createShoppingItemAction } from "@/app/actions/shopping";
 import { showToast } from "@/lib/toast";
@@ -54,11 +53,12 @@ export function AddShoppingItem({ cards = [] }: AddShoppingItemProps) {
   const [selectedCardId, setSelectedCardId] = useState("");
 
   const { register, handleSubmit, reset, watch } = useForm({
-    defaultValues: { name: "", quantity: "1", cost: "" },
+    defaultValues: { name: "", quantity: "1", cost: "", productUrl: "" },
   });
 
   const watchName = watch("name");
   const watchCost = watch("cost");
+  const watchProductUrl = watch("productUrl");
   const safeCards = Array.isArray(cards) ? cards : [];
 
   const getCardGradient = (colorTheme: string) => {
@@ -73,11 +73,11 @@ export function AddShoppingItem({ cards = [] }: AddShoppingItemProps) {
   const onSubmit = async (data: any) => {
     try {
       setSubmitting(true);
-      // Only create the item - transaction happens when checked
       await createShoppingItemAction({
         name: data.name,
         category: selectedCategory || undefined,
         quantity: parseInt(data.quantity) || 1,
+        productUrl: data.productUrl || undefined,
         cost: data.cost ? parseFloat(data.cost) : undefined,
         cardId: selectedCardId || undefined,
       });
@@ -125,8 +125,43 @@ export function AddShoppingItem({ cards = [] }: AddShoppingItemProps) {
               <Input required placeholder="What do you need?" className="w-full border-2 focus:border-emerald-400 transition" {...register("name")} />
             </div>
 
+            {/* Product Image URL with Live Preview */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-muted-foreground flex justify-between">
+                <span>Image URL</span>
+                <span className="text-[10px] font-normal lowercase opacity-70">(Optional)</span>
+              </Label>
+              <div className="flex gap-3">
+                <div className="h-10 w-10 rounded-md bg-muted border flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {watchProductUrl ? (
+                    <img 
+                      src={watchProductUrl} 
+                      alt="Preview" 
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        e.currentTarget.parentElement?.classList.add('fallback-icon');
+                      }}
+                      onLoad={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'block';
+                      }}
+                    />
+                  ) : (
+                    <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Input 
+                    placeholder="Paste direct image link (e.g., .jpg, .png)" 
+                    className="w-full border-2 focus:border-emerald-400 transition" 
+                    {...register("productUrl")} 
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Category */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">Category</Label>
               <div className="grid grid-cols-4 gap-2">
                 {categories.map((cat) => {
@@ -160,7 +195,7 @@ export function AddShoppingItem({ cards = [] }: AddShoppingItemProps) {
               </div>
             </div>
 
-            {/* Card Picker - Only to link card, no transaction yet */}
+            {/* Card Picker */}
             {watchCost && parseFloat(watchCost) > 0 && safeCards.length > 0 && (
               <div className="space-y-2 p-3 rounded-xl bg-muted/30 border-2 border-dashed">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
