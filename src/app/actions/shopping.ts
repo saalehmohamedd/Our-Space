@@ -11,6 +11,7 @@ export async function createShoppingItemAction(data: {
   quantity: number;
   cost?: number;
   cardId?: string;
+  productUrl?: string;
 }) {
   try {
     await getCurrentUserOrThrow();
@@ -21,6 +22,7 @@ export async function createShoppingItemAction(data: {
         quantity: data.quantity || 1,
         cost: data.cost || null,
         cardId: data.cardId || null,
+        productUrl: data.productUrl || null,
       },
     });
     revalidatePath("/shopping");
@@ -38,6 +40,7 @@ export async function updateShoppingItemAction(
     quantity: number;
     cost?: number;
     cardId?: string;
+    productUrl?: string;
   }
 ) {
   try {
@@ -50,6 +53,7 @@ export async function updateShoppingItemAction(
         quantity: data.quantity,
         cost: data.cost || null,
         cardId: data.cardId || null,
+        productUrl: data.productUrl || null,
       },
     });
     revalidatePath("/shopping");
