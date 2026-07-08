@@ -3,9 +3,12 @@
 import React, { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Heart, Trash2, CalendarDays, Edit3 } from "lucide-react";
-import { toggleFavoriteMemory, archiveMemoryAction } from "@/app/actions/memories";
+import {
+  toggleFavoriteMemory,
+  archiveMemoryAction,
+} from "@/app/actions/memories";
 import { MemoryEditDialog } from "@/components/memories/memory-edit-dialog"; // 🌟 Import our standalone form component
-
+import { RatingSummary } from "@/components/ratings/rating-summary";
 interface ImageItem {
   id: string;
   url: string;
@@ -23,15 +26,21 @@ interface MemoryItem {
 
 interface MemoryCardProps {
   memory: MemoryItem;
+  ratingsData?: {
+    mine: any;
+    partner: any;
+    average: number | null;
+    count: number;
+  } | null;
 }
 
-export function MemoryCard({ memory }: MemoryCardProps) {
+export function MemoryCard({ memory, ratingsData }: MemoryCardProps) {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   return (
     <>
       <Card className="break-inside-avoid bg-card/70 backdrop-blur-sm overflow-hidden border group hover:shadow-md transition flex flex-col w-full">
-        <div 
+        <div
           className="cursor-pointer relative overflow-hidden w-full h-48 sm:h-56 md:h-64 bg-muted"
           onClick={() => setIsEditOpen(true)}
         >
@@ -48,7 +57,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
           </div>
         </div>
 
-        <CardContent 
+        <CardContent
           className="pt-4 space-y-2 cursor-pointer flex-grow"
           onClick={() => setIsEditOpen(true)}
         >
@@ -68,26 +77,39 @@ export function MemoryCard({ memory }: MemoryCardProps) {
               {memory.description}
             </p>
           )}
+          {ratingsData && ratingsData.average && ratingsData.average > 0 && (
+            <div className="pt-1">
+              <RatingSummary
+                mine={ratingsData.mine}
+                partner={ratingsData.partner}
+                average={ratingsData.average}
+                count={ratingsData.count}
+                size="sm"
+              />
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="border-t bg-muted/20 px-4 py-2.5 flex items-center justify-between mt-auto">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={async (e) => {
               e.stopPropagation(); // Avoid popping the form dialog simultaneously
               await toggleFavoriteMemory(memory.id, memory.isFavorite);
             }}
             className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-rose-500 transition"
           >
-            <Heart className={`h-4 w-4 ${memory.isFavorite ? "text-rose-500 fill-current" : ""}`} />
+            <Heart
+              className={`h-4 w-4 ${memory.isFavorite ? "text-rose-500 fill-current" : ""}`}
+            />
             {memory.isFavorite ? "Favorited" : "Favorite"}
           </button>
 
-          <button 
+          <button
             type="button"
             onClick={async (e) => {
               e.stopPropagation(); // Avoid popping the form dialog simultaneously
-              if(confirm("Are you sure you want to archive this capsule?")) {
+              if (confirm("Are you sure you want to archive this capsule?")) {
                 await archiveMemoryAction(memory.id);
               }
             }}
@@ -100,10 +122,10 @@ export function MemoryCard({ memory }: MemoryCardProps) {
       </Card>
 
       {/* 🌟 Render the modular dialog here controlling state globally via props */}
-      <MemoryEditDialog 
-        memory={memory} 
-        open={isEditOpen} 
-        onOpenChange={setIsEditOpen} 
+      <MemoryEditDialog
+        memory={memory}
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
       />
     </>
   );
