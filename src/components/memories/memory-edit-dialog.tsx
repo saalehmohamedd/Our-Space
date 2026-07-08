@@ -28,10 +28,14 @@ import {
   Trash2,
   Download,
   ExternalLink,
+  Star,
 } from "lucide-react";
 import { updateMemoryAction } from "@/app/actions/memories";
 import { uploadImageAction, deleteImageAction } from "@/app/actions/upload";
 import { showToast } from "@/lib/toast";
+import { RatingForm } from "@/components/ratings/rating-form";
+import { RatingSummary } from "@/components/ratings/rating-summary";
+import { getRatingsForEntity } from "@/app/actions/ratings.actions";
 
 interface ImageItem {
   id: string;
@@ -61,7 +65,6 @@ interface EditFormInputs {
   date: string;
 }
 
-// Cloudinary URL optimizer for better performance
 function getOptimizedImageUrl(url: string): string {
   if (!url || !url.includes("res.cloudinary.com")) return url;
   const parts = url.split("/upload/");
@@ -71,13 +74,10 @@ function getOptimizedImageUrl(url: string): string {
   return url;
 }
 
-// Get original quality URL for download
 function getOriginalImageUrl(url: string): string {
   if (!url || !url.includes("res.cloudinary.com")) return url;
-  // Remove any existing transformations to get original
   const parts = url.split("/upload/");
   if (parts.length === 2) {
-    // Check if there are transformations
     const afterUpload = parts[1];
     if (
       afterUpload.includes("/") &&
@@ -95,7 +95,6 @@ function getOriginalImageUrl(url: string): string {
   return url;
 }
 
-// Download image function
 async function downloadImage(url: string, filename: string) {
   try {
     const response = await fetch(url);
@@ -111,10 +110,7 @@ async function downloadImage(url: string, filename: string) {
     showToast.success("Image downloaded!", filename);
   } catch (error) {
     console.error("Download failed:", error);
-    showToast.error(
-      "Download failed",
-      "Could not download the image. Try opening it in a new tab.",
-    );
+    showToast.error("Download failed", "Could not download the image. Try opening it in a new tab.");
   }
 }
 
@@ -125,13 +121,15 @@ export function MemoryEditDialog({
 }: MemoryEditDialogProps) {
   const [updating, setUpdating] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [localImages, setLocalImages] = useState<ImageItem[]>(
-    memory.images || [],
-  );
+  const [localImages, setLocalImages] = useState<ImageItem[]>(memory.images || []);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingImage, setDeletingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Ratings state
+  const [ratingsData, setRatingsData] = useState<any>(null);
+  const [loadingRatings, setLoadingRatings] = useState(false);
 
   const {
     register,
@@ -146,7 +144,7 @@ export function MemoryEditDialog({
     },
   });
 
-  // Reset form and images when memory prop changes
+  // Load ratings when dialog opens
   React.useEffect(() => {
     if (open) {
       reset({
@@ -156,10 +154,27 @@ export function MemoryEditDialog({
       });
       setLocalImages(memory.images || []);
       setSelectedImageIndex(0);
+      loadRatings();
     }
   }, [open, memory, reset]);
 
-  // Handle image upload
+  const loadRatings = async () => {
+    setLoadingRatings(true);
+    try {
+      const data = await getRatingsForEntity("MEMORY", memory.id);
+      setRatingsData(data);
+    } catch (error) {
+      console.error("Failed to load ratings:", error);
+    } finally {
+      setLoadingRatings(false);
+    }
+  };
+
+  const handleRatingSuccess = () => {
+    loadRatings();
+    router.refresh();
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -168,7 +183,6 @@ export function MemoryEditDialog({
       setUploadingImage(true);
       const formData = new FormData();
 
-      // Upload each selected file
       for (let i = 0; i < files.length; i++) {
         formData.append("file", files[i]);
       }
@@ -177,39 +191,27 @@ export function MemoryEditDialog({
       const uploadedImages = await uploadImageAction(formData);
 
       if (uploadedImages && uploadedImages.length > 0) {
-        // Ensure each uploaded image has an id (use temporary id if missing)
         const imagesWithId = uploadedImages.map((img: any) => ({
-          id:
-            img.id ||
-            `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: img.id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           url: img.url,
           publicId: img.publicId || undefined,
         }));
 
         setLocalImages((prev) => [...prev, ...imagesWithId]);
-        // Select the first newly uploaded image
         setSelectedImageIndex(localImages.length);
-        showToast.success(
-          "Images uploaded!",
-          `${uploadedImages.length} photo(s) added`,
-        );
+        showToast.success("Images uploaded!", `${uploadedImages.length} photo(s) added`);
       }
     } catch (error) {
       console.error("Failed to upload images:", error);
-      showToast.error(
-        "Upload failed",
-        "Failed to upload images. Please try again.",
-      );
+      showToast.error("Upload failed", "Failed to upload images. Please try again.");
     } finally {
       setUploadingImage(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     }
   };
 
-  // Handle image deletion
   const handleDeleteImage = async (imageToDelete: ImageItem, index: number) => {
     if (!confirm("Are you sure you want to remove this image?")) return;
 
@@ -223,7 +225,6 @@ export function MemoryEditDialog({
       const updatedImages = localImages.filter((_, i) => i !== index);
       setLocalImages(updatedImages);
 
-      // Adjust selected index if needed
       if (selectedImageIndex >= updatedImages.length) {
         setSelectedImageIndex(Math.max(0, updatedImages.length - 1));
       }
@@ -231,10 +232,7 @@ export function MemoryEditDialog({
       showToast.success("Image removed");
     } catch (error) {
       console.error("Failed to delete image:", error);
-      showToast.error(
-        "Delete failed",
-        "Failed to delete image. Please try again.",
-      );
+      showToast.error("Delete failed", "Failed to delete image. Please try again.");
     } finally {
       setDeletingImage(false);
     }
@@ -272,17 +270,16 @@ export function MemoryEditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[92vw] max-w-[500px] rounded-2xl p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Image Gallery Section */}
-        <div className="relative w-full h-48 sm:h-56 bg-gradient-to-br from-rose-100 via-pink-50 to-purple-100 dark:from-rose-950/30 dark:via-pink-950/20 dark:to-purple-950/30">
+        <div className="relative w-full h-full sm:h-120 bg-gradient-to-br from-rose-100 via-pink-50 to-purple-100 dark:from-rose-950/30 dark:via-pink-950/20 dark:to-purple-950/30">
           {hasImages ? (
             <>
               <img
                 src={getOptimizedImageUrl(currentImage!.url)}
                 alt={`${memory.title} - Image ${selectedImageIndex + 1}`}
-                className="w-full h-full object-cover transition-opacity duration-300"
+                className="w-full h-full object-cover transition-opacity duration-300 "
                 loading="lazy"
               />
 
-              {/* Image counter badge */}
               {localImages.length > 1 && (
                 <Badge
                   variant="secondary"
@@ -292,14 +289,10 @@ export function MemoryEditDialog({
                 </Badge>
               )}
 
-              {/* Top left action buttons */}
               <div className="absolute top-3 left-3 flex gap-2">
-                {/* Delete current image button */}
                 <button
                   type="button"
-                  onClick={() =>
-                    handleDeleteImage(currentImage!, selectedImageIndex)
-                  }
+                  onClick={() => handleDeleteImage(currentImage!, selectedImageIndex)}
                   disabled={deletingImage}
                   className="p-2 rounded-full bg-red-500/80 hover:bg-red-600 backdrop-blur-md text-white transition disabled:opacity-50"
                   title="Delete current image"
@@ -307,7 +300,6 @@ export function MemoryEditDialog({
                   <Trash2 className="h-4 w-4" />
                 </button>
 
-                {/* Download button */}
                 <button
                   type="button"
                   onClick={() => {
@@ -321,7 +313,6 @@ export function MemoryEditDialog({
                   <Download className="h-4 w-4" />
                 </button>
 
-                {/* Open in new tab button */}
                 <button
                   type="button"
                   onClick={() => {
@@ -335,7 +326,6 @@ export function MemoryEditDialog({
                 </button>
               </div>
 
-              {/* Navigation arrows for multiple images */}
               {localImages.length > 1 && (
                 <div className="absolute inset-x-0 bottom-0 flex justify-between p-3">
                   <button
@@ -343,7 +333,7 @@ export function MemoryEditDialog({
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedImageIndex((prev) =>
-                        prev === 0 ? localImages.length - 1 : prev - 1,
+                        prev === 0 ? localImages.length - 1 : prev - 1
                       );
                     }}
                     className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/60 transition"
@@ -355,7 +345,7 @@ export function MemoryEditDialog({
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedImageIndex((prev) =>
-                        prev === localImages.length - 1 ? 0 : prev + 1,
+                        prev === localImages.length - 1 ? 0 : prev + 1
                       );
                     }}
                     className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/60 transition"
@@ -377,7 +367,6 @@ export function MemoryEditDialog({
             </div>
           )}
 
-          {/* Upload image button overlay */}
           <div className="absolute bottom-3 right-3 flex gap-2">
             <input
               ref={fileInputRef}
@@ -449,7 +438,6 @@ export function MemoryEditDialog({
                 </div>
               </div>
 
-              {/* Image thumbnails grid */}
               {localImages.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {localImages.map((image, index) => (
@@ -467,7 +455,6 @@ export function MemoryEditDialog({
                         alt={`Thumbnail ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
-                      {/* Thumbnail actions */}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1">
                         <button
                           type="button"
@@ -553,6 +540,47 @@ export function MemoryEditDialog({
               />
             </div>
 
+            <div className="space-y-3 p-4 rounded-xl bg-muted/30 border">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-400" />
+                <h4 className="text-sm font-semibold">Ratings</h4>
+              </div>
+
+              {loadingRatings && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading ratings...
+                </div>
+              )}
+
+              {!loadingRatings && ratingsData && (
+                <RatingSummary
+                  mine={ratingsData.mine}
+                  partner={ratingsData.partner}
+                  average={ratingsData.average}
+                  size="sm"
+                />
+              )}
+
+              {/* Rating form - always show when not loading */}
+              {!loadingRatings && (
+                <RatingForm
+                  entityType="MEMORY"
+                  entityId={memory.id}
+                  existingRating={
+                    ratingsData?.mine
+                      ? {
+                          stars: ratingsData.mine.stars,
+                          comment: ratingsData.mine.comment,
+                        }
+                      : null
+                  }
+                  revalidate="/memories"
+                  onSuccess={handleRatingSuccess}
+                />
+              )}
+            </div>
+
             {/* Action Buttons */}
             <div className="flex items-center gap-3 pt-3">
               <Button
@@ -589,7 +617,6 @@ export function MemoryEditDialog({
           </form>
         </div>
 
-        {/* Quick Info Footer */}
         <div className="px-5 sm:px-6 py-3 bg-muted/30 border-t flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {memory.isFavorite ? "❤️ Favorited memory" : "📸 Memory capsule"}

@@ -40,7 +40,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  if (event.type !== "user.created") {
+  // Handle both creation and updates (e.g. avatar changes via UserButton)
+  if (event.type !== "user.created" && event.type !== "user.updated") {
     return NextResponse.json({ received: true });
   }
 
@@ -52,32 +53,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing primary email" }, { status: 400 });
   }
 
-  const role = getAllowedPartnerRole(primaryEmail);
+  // On update, don't re-gate on getAllowedPartnerRole for existing rows —
+  // only apply it for brand-new users. Otherwise an existing user whose
+  // email somehow fails the role check would get silently skipped on update.
+  if (event.type === "user.created") {
+    const role = getAllowedPartnerRole(primaryEmail);
+    if (!role) {
+      return NextResponse.json({ received: true });
+    }
 
-  if (!role) {
-    return NextResponse.json({ received: true });
+    const name =
+      [event.data.first_name, event.data.last_name].filter(Boolean).join(" ") ||
+      primaryEmail;
+
+    await prisma.user.upsert({
+      where: { email: primaryEmail },
+      update: {
+        clerkId: event.data.id,
+        role,
+        name,
+        avatarUrl: event.data.image_url,
+      },
+      create: {
+        clerkId: event.data.id,
+        role,
+        name,
+        email: primaryEmail,
+        avatarUrl: event.data.image_url,
+      },
+    });
+  } else {
+    // user.updated: just sync profile fields for the existing row
+    const name =
+      [event.data.first_name, event.data.last_name].filter(Boolean).join(" ") ||
+      primaryEmail;
+
+    await prisma.user.updateMany({
+      where: { clerkId: event.data.id },
+      data: {
+        name,
+        avatarUrl: event.data.image_url,
+      },
+    });
   }
-
-  const name =
-    [event.data.first_name, event.data.last_name].filter(Boolean).join(" ") ||
-    primaryEmail;
-
-  await prisma.user.upsert({
-    where: { email: primaryEmail },
-    update: {
-      clerkId: event.data.id,
-      role,
-      name,
-      avatarUrl: event.data.image_url,
-    },
-    create: {
-      clerkId: event.data.id,
-      role,
-      name,
-      email: primaryEmail,
-      avatarUrl: event.data.image_url,
-    },
-  });
 
   return NextResponse.json({ received: true });
 }

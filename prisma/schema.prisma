@@ -82,6 +82,22 @@ model User {
   notes           PrivateNote[]
   reminders       Reminder[]
   cards Card[]
+  ratings Rating[]
+}
+
+model Rating {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  raterId    String
+  rater      User     @relation(fields: [raterId], references: [id])
+  stars      Int      // 1-5
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([entityType, entityId, raterId])
+  @@index([entityType, entityId])
 }
 
 model Image {
